@@ -1,4 +1,4 @@
-// get.js - CNS Dapr client example
+// conns.js - CNS Dapr client example
 // Copyright 2023 Padi, Inc. All Rights Reserved.
 
 'use strict';
@@ -6,11 +6,14 @@
 // Imports
 
 const dapr = require('@dapr/dapr');
+
 const env = require('dotenv').config();
+const table = require('table');
 
 // Errors
 
 const E_CONTEXT = 'no context';
+const E_CONNECTIONS = 'no connections';
 const E_BADREQUEST = 'bad request';
 
 // Defaults
@@ -41,14 +44,35 @@ const client = new dapr.DaprClient({
   }
 });
 
-// Get invoke path
-function location(path) {
-  const home = 'node/contexts/' + config.CNS_CONTEXT;
+// Display results
+function display(data, pattern) {
+  const c = [['Capability', 'Provider', 'Consumer', 'Status', 'Connection ID']];
 
-  if (path.startsWith('~')) return home + path.substr(1);
-  if (path.startsWith('/')) return path;
+  for (const name in data) {
+    const cap = data[name];
 
-  return (path !== '')?(home + '/' + path):home;
+    // Display connections
+    for (const id in cap.connections) {
+      const conn = cap.connections[id];
+
+      // Filter by profile name
+      if (pattern === undefined || match(name, '*' + pattern + '*'))
+        c.push([name, conn.provider, conn.consumer, conn.status, id]);
+    }
+  }
+
+  // None found?
+  if (c.length <= 1)
+    throw new Error(E_CONNECTIONS);
+
+  // Display results
+  console.log(table.table(c).trim());
+}
+
+// Wildcard match
+function match(text, pattern) {
+  const esc = (text) => text.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, '\\$1');
+  return new RegExp('^' + pattern.split('*').map(esc).join('.*') + '$').test(text);
 }
 
 // Client application
@@ -64,22 +88,26 @@ async function start() {
   var res;
 
   try {
-    // dapr invoke --app-id cns-dapr --method node/contexts/$CNS_CONTEXT --verb GET
+    // dapr invoke --app-id cns-dapr --method node/contexts/$CNS_CONTEXT/capabilities --verb GET
     res = await client.invoker.invoke(
       config.CNS_DAPR,
-      location(process.argv[2] || ''),
+      'node/contexts/' + config.CNS_CONTEXT + '/capabilities',
       dapr.HttpMethod.GET);
   } catch(e) {
     // Failure
     throw new Error(E_BADREQUEST);
   }
 
+  // CNS Dapr error?
+  if (res.error !== undefined)
+    throw new Error(res.error);
+
   // Display results
-  console.log(JSON.stringify(res, null, 2));
+  display(res.data, process.argv[2]);
 }
 
 // Start application
 start().catch((e) => {
-  console.log(JSON.stringify({error: e.message}, null, 2));
+  console.error('Error:', e.message);
   process.exit(1);
 });

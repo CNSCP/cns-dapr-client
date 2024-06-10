@@ -6,63 +6,81 @@
 // Imports
 
 const dapr = require('@dapr/dapr');
-const merge = require('object-merge');
+
+const env = require('dotenv').config();
 const table = require('table');
 
-// Constants
+// Errors
 
-const SERVER_HOST = process.env.CNS_SERVER_HOST || 'localhost';
-const SERVER_PORT = process.env.CNS_SERVER_PORT || '3100';
+const E_CONTEXT = 'no context';
+const E_BADREQUEST = 'bad request';
 
-const DAPR_HOST = process.env.CNS_DAPR_HOST || 'localhost';
-const DAPR_PORT = process.env.CNS_DAPR_PORT || '3500';
+// Defaults
 
-const CNS_DAPR = process.env.CNS_DAPR || 'cns-dapr';
-const CNS_PUBSUB = process.env.CNS_PUBSUB || 'cns-pubsub';
-const CNS_CONTEXT = process.env.CNS_CONTEXT || '';
+const defaults = {
+  CNS_CONTEXT: '',
+  CNS_DAPR: 'cns-dapr',
+  CNS_DAPR_HOST: 'localhost',
+  CNS_DAPR_PORT: '3500',
+  CNS_PUBSUB: 'cns-pubsub',
+  CNS_SERVER_HOST: 'localhost',
+  CNS_SERVER_PORT: '3100'
+};
+
+// Config
+
+const config = {
+  CNS_CONTEXT: process.env.CNS_CONTEXT || defaults.CNS_CONTEXT,
+  CNS_DAPR: process.env.CNS_DAPR || defaults.CNS_DAPR,
+  CNS_DAPR_HOST: process.env.CNS_DAPR_HOST || defaults.CNS_DAPR_HOST,
+  CNS_DAPR_PORT: process.env.CNS_DAPR_PORT || defaults.CNS_DAPR_PORT,
+  CNS_PUBSUB: process.env.CNS_PUBSUB || defaults.CNS_PUBSUB,
+  CNS_SERVER_HOST: process.env.CNS_SERVER_HOST || defaults.CNS_SERVER_HOST,
+  CNS_SERVER_PORT: process.env.CNS_SERVER_PORT || defaults.CNS_SERVER_PORT
+};
 
 // Dapr client
 
 const client = new dapr.DaprClient({
-  daprHost: DAPR_HOST,
-  daprPort: DAPR_PORT
+  daprHost: config.CNS_DAPR_HOST,
+  daprPort: config.CNS_DAPR_PORT,
+  logger: {
+    level: dapr.LogLevel.Error
+  }
 });
 
 // Dapr server
 
 const server = new dapr.DaprServer({
-  serverHost: SERVER_HOST,
-  serverPort: SERVER_PORT,
+  serverHost: config.CNS_SERVER_HOST,
+  serverPort: config.CNS_SERVER_PORT,
   clientOptions: {
-    daprHost: DAPR_HOST,
-    daprPort: DAPR_PORT
+    daprHost: config.CNS_DAPR_HOST,
+    daprPort: config.CNS_DAPR_PORT
+  },
+  logger: {
+    level: dapr.LogLevel.Error
   }
 });
 
 // Local data
 
-var node = {};
 var updates = 0;
 
 // Display results
 function display(data) {
-  // Merge changes
-  node = merge(node, data);
-
   // Show update number
-  console.log(table.table([['Update #' + ++updates]]).trim());
+  if (updates > 0)
+    console.log(table.table([['Update #' + updates]]).trim());
 
-  // Show node metadata changes
-  const m = [];
+  updates++;
 
-  for (const name in data) {
-    if (name !== 'connections')
-      m.push([name, data[name]]);
-  }
+  // Show context changes
+  const m = metadata(data);
 
   if (m.length > 0) {
     console.log(table.table(m, {
-      header: {content: 'Node Metadata', alignment: 'center', truncate: 80},
+      header: {content: 'Context ' + config.CNS_CONTEXT, truncate: 76},
       columns: {
         0: {width: 16, truncate: 16},
         1: {width: 57, wrapWord: true}
@@ -70,75 +88,96 @@ function display(data) {
     }).trim());
   }
 
-  // Show connection changes
-  for (const id in data.connections) {
-    const conn = node.connections[id];
+  // Display capabilities
+  list('Capability', data.capabilities);
+}
 
-    // Was connection deleted?
-    if (conn === null) {
-      console.log(table.table([['Connection ' + id + ' Deleted']]).trim());
-      delete node.connections[id];
+// Display list
+function list(type, data) {
+  // Show list changes
+  for (const name in data) {
+    const o = data[name];
+
+    // Was it removed?
+    if (o === null) {
+      console.log(table.table([[type + ' ' + name + ' removed']]).trim());
       continue;
     }
 
-    const c = [];
+    // Show metadata and properties
+    const m = metadata(o);
     const p = [];
 
-    // Add connection metadata
-    for (const name in conn) {
-      if (name !== 'properties')
-        c.push([name, conn[name]]);
+    for (const name in o.properties)
+      p.push([name, o.properties[name]]);
+
+    if (p.length > 0) {
+      // Combine properties
+      m.push(['properties', table.table(p, {
+        border: table.getBorderCharacters('void'),
+        columnDefault: {
+          paddingLeft: 0,
+          paddingRight: 1
+        },
+        columns: {
+          0: {width: 16, truncate: 16},
+          1: {width: 41, truncate: 41}
+        },
+        singleLine: true
+      }).trim()]);
     }
 
-    // Add connection properties
-    for (const name in conn.properties)
-      p.push([name, '│', conn.properties[name]]);
+    if (m.length > 0) {
+      // Show list
+      console.log(table.table(m, {
+        header: {content: type + ' ' + name, truncate: 76},
+        columns: {
+          0: {width: 16, truncate: 16},
+          1: {width: 57, wrapWord: true}
+        }
+      }).trim());
+    }
 
-    c.push(['properties', table.table(p, {
-      border: table.getBorderCharacters('void'),
-      columnDefault: {
-        paddingLeft: 0,
-        paddingRight: 1
-      },
-      columns: {
-        0: {width: 16, truncate: 16},
-        1: {width: 1},
-        2: {width: 38, truncate: 38}
-      },
-      drawHorizontalLine: () => false
-    }).trim()]);
-
-    // Show connection
-    console.log(table.table(c, {
-      header: {content: 'Connection ' + id, alignment: 'center', truncate: 80},
-      columns: {
-        0: {width: 16, truncate: 16},
-        1: {width: 57, wrapWord: true}
-      }
-    }).trim());
+    // Display connections
+    if (o.connections !== undefined)
+      list('Connection', o.connections);
   }
+}
+
+// Create metadata table
+function metadata(data) {
+  const t = [];
+
+  for (const name in data) {
+    const value = data[name];
+
+    if (typeof value !== 'object')
+      t.push([name, value]);
+  }
+  return t;
 }
 
 // Client application
 async function start() {
   // No context?
-  if (CNS_CONTEXT === '')
-    throw new Error('not configured');
+  if (config.CNS_CONTEXT === '')
+    throw new Error(E_CONTEXT);
 
   // Start client
   await client.start();
 
   // Fetch current
+  const context = 'node/contexts/' + config.CNS_CONTEXT;
   var res;
 
   try {
     res = await client.invoker.invoke(
-      CNS_DAPR,
-      CNS_CONTEXT,
+      config.CNS_DAPR,
+      context,
       dapr.HttpMethod.GET);
   } catch(e) {
     // Failure
-    throw new Error('bad request');
+    throw new Error(E_BADREQUEST);
   }
 
   // CNS Dapr error?
@@ -148,10 +187,12 @@ async function start() {
   // Display results
   display(res.data);
 
-  // Subscribe to changes
+  // Subscribe to topic
+  console.log(table.table([['Subscribing to ' + context]]).trim());
+
   server.pubsub.subscribe(
-    CNS_PUBSUB,
-    CNS_CONTEXT,
+    config.CNS_PUBSUB,
+    context,
     display);
 
   // Start server

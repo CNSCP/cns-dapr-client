@@ -47,29 +47,15 @@ The example uses the following environment variables to configure itself:
 
 | Variable         | Description                      | Default                |
 |------------------|----------------------------------|------------------------|
-| CNS_SERVER_HOST  | CNS Example server host          | 'localhost'            |
-| CNS_SERVER_PORT  | CNS Example server port          | '3100'                 |
-| CNS_DAPR_HOST    | Dapr host                        | 'localhost'            |
-| CNS_DAPR_PORT    | Dapr port                        | '3500'                 |
-| CNS_DAPR         | CNS Dapr application ID          | 'cns-dapr'             |
-| CNS_PUBSUB       | CNS Dapr PUBSUB component ID     | 'cns-pubsub'           |
-| CNS_CONTEXT      | CNS Dapr context                 | Must be set            |
+| CNS_CONTEXT      | CNS Broker context               | Must be set            |
+| CNS_DAPR         | CNS Dapr application             | 'cns-dapr'             |
+| CNS_DAPR_HOST    | CNS Dapr host                    | 'localhost'            |
+| CNS_DAPR_PORT    | CNS Dapr port                    | '3500'                 |
+| CNS_PUBSUB       | CNS Dapr PUBSUB component        | 'cns-pubsub'           |
+| CNS_SERVER_HOST  | CNS Client server host           | 'localhost'            |
+| CNS_SERVER_PORT  | CNS Client server port           | '3100'                 |
 
-#### Linux
-
-| Command                              | Description                           |
-|--------------------------------------|---------------------------------------|
-| env                                  | List all variables                    |
-| export [name]=[value]                | Set variable                          |
-| unset [name]                         | Remove variable                       |
-
-#### Windows
-
-| Command                              | Description                           |
-|--------------------------------------|---------------------------------------|
-| set                                  | List all variables                    |
-| set [name]=[value]                   | Set variable                          |
-| set [name]=                          | Remove variable                       |
+Alternatively, variables can be stored in a `.env` file in the project directory.
 
 ### Walkthrough
 
@@ -97,7 +83,10 @@ await client.start();
 Once the client is started, it invokes a `GET /<context>` request to the CNS Dapr Sidecar. Any communication error thrown by the Dapr SDK is also caught and displayed.
 
 ```
-res = await client.invoker.invoke(CNS_DAPR, CNS_CONTEXT, dapr.HttpMethod.GET);
+res = await client.invoker.invoke(
+  config.CNS_DAPR,
+  context,
+  dapr.HttpMethod.GET);
 ```
 
 Now it checks the response from CNS Dapr for errors.
@@ -117,7 +106,10 @@ For a full rundown of methods and what is returned in the `data` object, see the
 Now the example sets up a subscription to CNS Dapr, listening for changes to the context topic. When changes arrive, these also get sent to the `display` function.
 
 ```
-server.pubsub.subscribe(CNS_PUBSUB, CNS_CONTEXT, display);
+server.pubsub.subscribe(
+  config.CNS_PUBSUB,
+  context,
+  display);
 ```
 
 Once the subscription has been setup, the application starts the DaprServer.
@@ -130,15 +122,15 @@ The example now sits displaying context topic changes until the application is c
 
 ### Other Examples
 
-| Example                        | Description                | Source         |
-|--------------------------------|----------------------------|----------------|
-| npm run start                  | Main example application   | index.js       |
-| npm run get [method]           | Invoke a GET method        | get.js         |
-| npm run post [method] [data]   | Invoke a POST method       | post.js        |
-| npm run publish [topic] [data] | Publish to a topic         | publish.js     |
-| npm run subscribe [topic]      | Subscribe to a topic       | subscribe.js   |
-| npm run list [profile] [role]  | List active connections    | list.js        |
-| npm run profile [profile]      | Display profile metadata   | profile.js     |
+| Example                        | Description               | Source          |
+|--------------------------------|---------------------------|-----------------|
+| npm run start                  | Main example application  | index.js        |
+| npm run subscribe              | Subscribe to context      | subscribe.js    |
+| npm run publish [data]         | Publish to context        | publish.js      |
+| npm run get [path]             | Invoke a GET method       | get.js          |
+| npm run post [path] [data]     | Invoke a POST method      | post.js         |
+| npm run profile [name]         | Show profile definition   | profile.js      |
+| npm run conns                  | Show active connections   | conns.js        |
 
 ## Maintainers
 

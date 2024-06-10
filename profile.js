@@ -6,95 +6,115 @@
 // Imports
 
 const dapr = require('@dapr/dapr');
+
+const env = require('dotenv').config();
 const table = require('table');
 
-// Constants
+// Errors
 
-const SERVER_HOST = process.env.CNS_SERVER_HOST || 'localhost';
-const SERVER_PORT = process.env.CNS_SERVER_PORT || '3100';
+const E_PROFILE = 'no profile';
+const E_BADREQUEST = 'bad request';
 
-const DAPR_HOST = process.env.CNS_DAPR_HOST || 'localhost';
-const DAPR_PORT = process.env.CNS_DAPR_PORT || '3500';
+// Defaults
 
-const CNS_DAPR = process.env.CNS_DAPR || 'cns-dapr';
-const CNS_CONTEXT = process.env.CNS_CONTEXT || '';
+const defaults = {
+  CNS_DAPR: 'cns-dapr',
+  CNS_DAPR_HOST: 'localhost',
+  CNS_DAPR_PORT: '3500'
+};
+
+// Config
+
+const config = {
+  CNS_DAPR: process.env.CNS_DAPR || defaults.CNS_DAPR,
+  CNS_DAPR_HOST: process.env.CNS_DAPR_HOST || defaults.CNS_DAPR_HOST,
+  CNS_DAPR_PORT: process.env.CNS_DAPR_PORT || defaults.CNS_DAPR_PORT
+};
 
 // Dapr client
 
 const client = new dapr.DaprClient({
-  daprHost: DAPR_HOST,
-  daprPort: DAPR_PORT
+  daprHost: config.CNS_DAPR_HOST,
+  daprPort: config.CNS_DAPR_PORT,
+  logger: {
+    level: dapr.LogLevel.Error
+  }
 });
 
 // Display results
 function display(data) {
-  // Show profile metadata
   const m = [];
+  const p = [];
 
+  // Add metadata
   for (const name in data) {
-    if (name !== 'versions')
-      m.push([name, data[name]]);
+    const value = data[name];
+
+    if (typeof value !== 'object')
+      m.push([name, value]);
   }
 
+  // Add properties
+  for (const name in data.properties) {
+    const property = data.properties[name];
+
+    const flags =
+      (property.required?'R':'-') +
+      (property.propagate?'P':'-');
+
+    p.push([name, property.comment, flags]);
+  }
+
+  if (p.length > 0) {
+    // Combine properties
+    m.push(['properties', table.table(p, {
+      border: table.getBorderCharacters('void'),
+      columnDefault: {
+        paddingLeft: 0,
+        paddingRight: 1
+      },
+      columns: {
+        0: {width: 16, truncate: 16},
+        1: {width: 37, truncate: 37},
+        2: {width: 2}
+      },
+      singleLine: true
+    }).trim()]);
+  }
+
+  // Show definition
   console.log(table.table(m, {
-    header: {content: 'Profile Metadata', alignment: 'center', truncate: 80},
+    header: {content: 'Profile Definition', truncate: 76},
     columns: {
       0: {width: 16, truncate: 16},
       1: {width: 57, wrapWord: true}
     }
   }).trim());
-
-  var ver = 0;
-
-  // Show profile versions
-  for (const version of data.versions) {
-    const v = [];
-
-    // Add properties and flags
-    for (const property of version.properties) {
-      var flags = '';
-
-      flags += (property.server === null)?'S':'-';
-      flags += (property.propagate === null)?'P':'-';
-      flags += (property.required === null)?'R':'-';
-
-      v.push([property.name, property.description, flags]);
-    }
-
-    // Show profile
-    console.log(table.table(v, {
-      header: {content: 'Version #' + ++ver, alignment: 'center', truncate: 80},
-      columns: {
-        0: {width: 16, truncate: 16},
-        1: {width: 51, wrapWord: true},
-        2: {width: 3}
-      }
-    }).trim());
-  }
 }
 
 // Client application
 async function start() {
-  // No context?
-  if (CNS_CONTEXT === '')
-    throw new Error('not configured');
-
   // Start client
   await client.start();
+
+  // Process command line
+  const profile = process.argv[2] || '';
+
+  if (profile === '')
+    throw new Error(E_PROFILE);
 
   // Fetch profile
   var res;
 
   try {
-    const profile = process.argv[2] || 'test.abc';
-
+    // dapr invoke --app-id cns-dapr --method profiles/cp:test.abc.v1 --verb GET
     res = await client.invoker.invoke(
-      CNS_DAPR,
+      config.CNS_DAPR,
       'profiles/' + profile,
       dapr.HttpMethod.GET);
   } catch(e) {
     // Failure
-    throw new Error('bad request');
+    throw new Error(E_BADREQUEST);
   }
 
   // CNS Dapr error?

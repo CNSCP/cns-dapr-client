@@ -6,39 +6,59 @@
 // Imports
 
 const dapr = require('@dapr/dapr');
+const env = require('dotenv').config();
 
-// Constants
+// Errors
 
-const SERVER_HOST = process.env.CNS_SERVER_HOST || 'localhost';
-const SERVER_PORT = process.env.CNS_SERVER_PORT || '3100';
+const E_CONTEXT = 'no context';
 
-const DAPR_HOST = process.env.CNS_DAPR_HOST || 'localhost';
-const DAPR_PORT = process.env.CNS_DAPR_PORT || '3500';
+// Defaults
 
-const CNS_PUBSUB = process.env.CNS_PUBSUB || 'cns-pubsub';
-const CNS_CONTEXT = process.env.CNS_CONTEXT || '';
+const defaults = {
+  CNS_CONTEXT: '',
+  CNS_DAPR_HOST: 'localhost',
+  CNS_DAPR_PORT: '3500',
+  CNS_PUBSUB: 'cns-pubsub',
+  CNS_SERVER_HOST: 'localhost',
+  CNS_SERVER_PORT: '3100'
+};
+
+// Config
+
+const config = {
+  CNS_CONTEXT: process.env.CNS_CONTEXT || defaults.CNS_CONTEXT,
+  CNS_DAPR_HOST: process.env.CNS_DAPR_HOST || defaults.CNS_DAPR_HOST,
+  CNS_DAPR_PORT: process.env.CNS_DAPR_PORT || defaults.CNS_DAPR_PORT,
+  CNS_PUBSUB: process.env.CNS_PUBSUB || defaults.CNS_PUBSUB,
+  CNS_SERVER_HOST: process.env.CNS_SERVER_HOST || defaults.CNS_SERVER_HOST,
+  CNS_SERVER_PORT: process.env.CNS_SERVER_PORT || defaults.CNS_SERVER_PORT
+};
 
 // Dapr server
 
 const server = new dapr.DaprServer({
-  serverHost: SERVER_HOST,
-  serverPort: SERVER_PORT,
+  serverHost: config.CNS_SERVER_HOST,
+  serverPort: config.CNS_SERVER_PORT,
   clientOptions: {
-    daprHost: DAPR_HOST,
-    daprPort: DAPR_PORT
+    daprHost: config.CNS_DAPR_HOST,
+    daprPort: config.CND_DAPR_PORT
+  },
+  logger: {
+    level: dapr.LogLevel.Error
   }
 });
 
 // Client application
 async function start() {
   // No context?
-  if (CNS_CONTEXT === '')
-    throw new Error('not configured');
+  if (config.CNS_CONTEXT === '')
+    throw new Error(E_CONTEXT);
 
-  // Subscribe to topic
-  const topic = process.argv[2] || CNS_CONTEXT;
+  // Subscribe to context
+  const context = 'node/contexts/' + config.CNS_CONTEXT;
+  console.log('Subscribing to:', context);
 
-  server.pubsub.subscribe(CNS_PUBSUB, topic, (data) => {
+  server.pubsub.subscribe(config.CNS_PUBSUB, context, (data) => {
     console.log(topic, '=', JSON.stringify(data, null, 2));
   });
 

@@ -1,25 +1,25 @@
 {
   "name": "cns-dapr-client",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Dapr CNS Client",
   "author": "Padi, Inc",
   "license": "ISC",
   "main": "index.js",
   "scripts": {
-    "start": "dapr run --app-id cns-dapr-client --app-port 3100 --app-protocol http --resources-path ../cns-dapr/components --log-level error -- node index",
-    "get": "dapr run --app-id cns-dapr-get -- node get",
-    "post": "dapr run --app-id cns-dapr-post -- node post",
-    "publish": "dapr run --app-id cns-dapr-publish -- node publish",
-    "subscribe": "dapr run --app-id cns-dapr-subscribe --app-port 3100 --app-protocol http --resources-path ../cns-dapr/components -- node subscribe",
-    "list": "dapr run --app-id cns-dapr-list --log-level error -- node list",
-    "profile": "dapr run --app-id cns-dapr-profile --log-level error -- node profile",
-    "stop": "killall node",
+    "start": "dapr run --app-id cns-dapr-client --app-port 3100 --resources-path ../cns-dapr/components --log-level error -- node index",
+    "subscribe": "dapr run --app-id cns-dapr-client --app-port 3100 --resources-path ../cns-dapr/components --log-level error -- node subscribe",
+    "stop": "dapr stop --app-id cns-dapr-client",
+    "publish": "node publish",
+    "get": "node get",
+    "post": "node post",
+    "profile": "node profile",
+    "conns": "node conns",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@dapr/dapr": "^3.1.2",
+    "dotenv": "^16.4.5",
     "object-merge": "^2.5.1",
-    "table": "^6.8.1",
-    "wildcard": "^2.0.1"
+    "table": "^6.8.1"
   }
 }
