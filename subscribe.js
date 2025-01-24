@@ -56,10 +56,10 @@ async function start() {
 
   // Subscribe to context
   const context = 'node/contexts/' + config.CNS_CONTEXT;
-  console.log('Subscribing to:', context);
+  console.log('Subscribing:', context);
 
   server.pubsub.subscribe(config.CNS_PUBSUB, context, (data) => {
-    console.log(topic, '=', JSON.stringify(data, null, 2));
+    console.log(context, '=', JSON.stringify(data, null, 2));
   });
 
   // Start server

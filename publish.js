@@ -65,7 +65,7 @@ async function start() {
   }
 
   // Display results
-  console.log('Published to:', context);
+  console.log('Published:', context);
 }
 
 // Start application
